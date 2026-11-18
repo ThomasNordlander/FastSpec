@@ -24,6 +24,11 @@ MODULE IOUtils
   ! First call of WriteLinStr creates the output file, subsequent calls append to it
   LOGICAL :: LinStrNew = .TRUE.
 
+  ! The HDF5 library is opened once (h5open_f) and never closed. HDF5 1.10
+  ! h5open_f returns without setting its INTENT(OUT) error argument when the
+  ! library is already open, so a second call cannot be checked reliably
+  LOGICAL, PRIVATE :: H5Opened = .FALSE.
+
   CONTAINS
 
   ! Read the input file (keyword-driven format)
@@ -569,8 +574,11 @@ MODULE IOUtils
     IF (.NOT. Exists) CALL ErrStop('ReadHDF: file not found: ' // TRIM(ADJUSTL(File)))
 
     ! Open HDF5 library and suppress automatic error messages
-    CALL h5open_f(Ierr)
-    IF (Ierr /= 0) STOP 'ReadHDF: h5open_f failed'
+    IF (.NOT. H5Opened) THEN
+      CALL h5open_f(Ierr)
+      IF (Ierr /= 0) STOP 'ReadHDF: h5open_f failed'
+      H5Opened = .TRUE.
+    END IF
     CALL h5eset_auto_f(0, Ierr)
     IF (Ierr /= 0) STOP 'ReadHDF: h5eset_auto_f failed'
 
@@ -1166,8 +1174,11 @@ MODULE IOUtils
     IF (.NOT. Exists) CALL ErrStop('IsHDF5: file not found: ' // TRIM(ADJUSTL(File)))
 
     ! Probe the HDF5 superblock signature with automatic error printing suppressed
-    CALL h5open_f(Ierr)
-    IF (Ierr /= 0) STOP 'IsHDF5: h5open_f failed'
+    IF (.NOT. H5Opened) THEN
+      CALL h5open_f(Ierr)
+      IF (Ierr /= 0) STOP 'IsHDF5: h5open_f failed'
+      H5Opened = .TRUE.
+    END IF
     CALL h5eset_auto_f(0, Ierr)
     CALL h5fis_hdf5_f(TRIM(File), Status, Ierr)
     IF (Ierr /= 0) Status = .FALSE.        ! a failed probe means "not HDF5"
